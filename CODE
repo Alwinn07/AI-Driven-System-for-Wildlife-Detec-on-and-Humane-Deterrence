@@ -4,7 +4,7 @@ import RPi.GPIO as GPIO
 import time
 
 # Load YOLO model
-model = YOLO("pals.pt")
+model = YOLO("animal_detection.pt")
 
 # Define GPIO pins for MUX control (S0, S1)
 S0 = 17  # GPIO pin for S0
