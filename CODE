@@ -1,0 +1,70 @@
+from ultralytics import YOLO
+import cv2
+import RPi.GPIO as GPIO
+import time
+
+# Load YOLO model
+model = YOLO("pals.pt")
+
+# Define GPIO pins for MUX control (S0, S1)
+S0 = 17  # GPIO pin for S0
+S1 = 27  # GPIO pin for S1
+
+# Configure GPIO
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(S0, GPIO.OUT)
+GPIO.setup(S1, GPIO.OUT)
+
+# Function to set MUX channel
+def set_mux_channel(channel):
+    if channel == 0:
+        GPIO.output(S0, GPIO.LOW)
+        GPIO.output(S1, GPIO.LOW)
+        print("[INFO] Dog detected → MUX set to D0")
+    elif channel == 1:  # No detection → Set to D1
+        GPIO.output(S0, GPIO.HIGH)
+        GPIO.output(S1, GPIO.LOW)
+        print("[INFO] No detection → MUX set to D1")
+    elif channel == 2:
+        GPIO.output(S0, GPIO.LOW)
+        GPIO.output(S1, GPIO.HIGH)
+        print("[INFO] Deer or Cat detected → MUX set to D2")
+    elif channel == 3:
+        GPIO.output(S0, GPIO.HIGH)
+        GPIO.output(S1, GPIO.HIGH)
+        print("[INFO] Elephant or Wild Boar detected → MUX set to D3")
+
+# Open webcam
+cap = cv2.VideoCapture(0)
+
+try:
+    while cap.isOpened():
+        success, frame = cap.read()
+        if not success:
+            print("[ERROR] Failed to capture frame")
+            break
+        
+        # Run YOLO inference
+        results = model.predict(frame)
+
+        # Extract detected classes
+        detected_classes = [r.names[int(box.cls)] for r in results for box in r.boxes]
+        # print(f"[INFO] Detected objects: {detected_classes}")
+
+        # Determine MUX output based on detection
+        if "dog" in detected_classes:
+            set_mux_channel(0)
+        elif "deer" in detected_classes or "cat" in detected_classes:
+            set_mux_channel(2)
+        elif "elephant" in detected_classes or "boar" in detected_classes:
+            set_mux_channel(3)
+        else:
+            set_mux_channel(1)  # No detection → D1
+
+        time.sleep(0.5)  # Small delay to stabilize MUX switching
+
+finally:
+    cap.release()
+    cv2.destroyAllWindows()
+    GPIO.cleanup()  # Reset GPIO on exit
+    print("[INFO] Cleanup done, exiting program")
